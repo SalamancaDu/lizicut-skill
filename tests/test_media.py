@@ -11,10 +11,22 @@ import tempfile
 import unittest
 import zlib
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/lizicut/scripts"))
 from render_media import inspect, render
-from timeline import LizicutError, run, validate, write_srt
+from timeline import LizicutError, probe, run, validate, write_srt
+
+
+def alpha_png(path: Path) -> None:
+    # Hidden red RGB must not bleed through zero alpha; the right half is 50% alpha.
+    def chunk(kind, payload):
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
+    rows = b"".join(b"\0" + b"".join(bytes((240, 30, 20,
+                       (255 if x < 80 else 128) if 40 <= x < 120 and 30 <= y < 90 else 0))
+                       for x in range(160)) for y in range(120))
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 160, 120, 8, 6, 0, 0, 0))
+                     + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "existing FFmpeg/ffprobe required for media integration")
@@ -50,6 +62,105 @@ class MediaTests(unittest.TestCase):
         result = subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-ss", str(seconds), "-i", str(path), "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], capture_output=True, check=True)
         offset = (y * 320 + x) * 3
         return tuple(result.stdout[offset:offset + 3])
+
+    def silent_visual(self):
+        data = copy.deepcopy(self.data)
+        data.pop("captions")
+        data["audio"] = []
+        data["project"].update(duration_ms=1000, timing_basis="fixed", audio_mode="silent", background="#00aa00")
+        data["shots"] = [{**data["shots"][0], "end_ms": 1000}]
+        (self.base / "background.ppm").write_bytes(b"P6\n320 180\n255\n" + bytes((0, 170, 0)) * (320 * 180))
+        data["assets"]["background"] = {**data["assets"]["red"], "path": "background.ppm"}
+        return data
+
+    def test_primary_png_composites_zero_and_partial_alpha_on_project_background(self):
+        alpha_png(self.base / "alpha.png")
+        for fit in ("contain", "cover"):
+            with self.subTest(fit=fit):
+                data = self.silent_visual()
+                data["assets"]["alpha"] = {**data["assets"]["red"], "path": "alpha.png"}
+                data["shots"][0].update(asset_id="alpha", fit=fit)
+                output = self.base / f"primary-alpha-{fit}.mp4"
+                report = render(data, self.base, output)
+                self.assertEqual(int(report["frames"]), 25)
+                for pixel, expected in ((self.pixel(output, 0.4, 20, 90), (0, 170, 0)),
+                                        (self.pixel(output, 0.4, 140, 90), (240, 30, 20)),
+                                        (self.pixel(output, 0.4, 200, 90), (120, 100, 10))):
+                    self.assertTrue(all(abs(a - b) < 18 for a, b in zip(pixel, expected)), (fit, pixel, expected))
+
+    def test_webm_alpha_is_decoded_for_primary_and_scheduled_overlay(self):
+        alpha_png(self.base / "alpha.png")
+        for codec in ("libvpx-vp9", "libvpx"):
+            source = self.base / f"alpha-{codec}.webm"
+            run([shutil.which("ffmpeg"), "-v", "error", "-nostdin", "-loop", "1", "-framerate", "25",
+                 "-i", str(self.base / "alpha.png"), "-t", "1", "-an", "-c:v", codec, "-b:v", "400k",
+                 "-auto-alt-ref", "0", "-pix_fmt", "yuva420p", "-threads", "1", str(source)])
+            self.assertEqual(probe(source)["streams"][0]["tags"]["alpha_mode"], "1")
+            for role in ("primary", "overlay"):
+                with self.subTest(codec=codec, role=role):
+                    data = self.silent_visual()
+                    data["assets"]["alpha"] = {**data["assets"]["green"], "path": source.name}
+                    data["shots"][0].update(asset_id="alpha" if role == "primary" else "background")
+                    if role == "overlay":
+                        data["overlays"] = [{"id": "alpha", "asset_id": "alpha", "role": "element", "start_ms": 200,
+                                             "end_ms": 1000, "x": 0, "y": 0, "width": 320, "height": 180,
+                                             "opacity": 0.5, "fade_in_ms": 200, "fade_out_ms": 200,
+                                             "purpose": "transparent source", "decision": "retain alpha during scheduled fades"}]
+                    output = self.base / f"webm-{codec}-{role}.mp4"
+                    render(data, self.base, output)
+                    transparent = self.pixel(output, 0.6, 60, 20)
+                    self.assertLess(transparent[0], 18)
+                    self.assertGreater(transparent[1], 150)
+                    solid = self.pixel(output, 0.6, 140, 90)
+                    expected = (240, 30, 20) if role == "primary" else (120, 100, 10)
+                    self.assertTrue(all(abs(a - b) < 22 for a, b in zip(solid, expected)), (codec, role, solid))
+                    if role == "overlay":
+                        self.assertLess(self.pixel(output, 0.08, 140, 90)[0], 18)
+                        self.assertLess(self.pixel(output, 0.28, 140, 90)[0], solid[0] - 40)
+                        self.assertLess(self.pixel(output, 0.92, 140, 90)[0], solid[0] - 35)
+        # Missing alpha decoder fails before temporary work or publication, never exports an opaque substitute.
+        output = self.base / "missing-decoder.mp4"
+        with patch("render_media.run", return_value=" V..... h264 H.264 decoder\n"):
+            with self.assertRaisesRegex(LizicutError, "assets.alpha: alpha_mode=1 requires FFmpeg decoder libvpx"):
+                render(data, self.base, output)
+        self.assertFalse(output.exists())
+        self.assertEqual(list(self.base.glob(".lizicut-*")), [])
+
+    def test_anamorphic_display_ratio_is_preserved_in_main_and_overlay_fits(self):
+        rows = b"".join(b"".join(bytes((20, 210, 30) if 240 <= x < 480 and 192 <= y < 384 else (220, 20, 30))
+                                 for x in range(720)) for y in range(576))
+        (self.base / "pal.ppm").write_bytes(b"P6\n720 576\n255\n" + rows)
+        source = self.base / "pal.mp4"
+        run([shutil.which("ffmpeg"), "-v", "error", "-nostdin", "-loop", "1", "-framerate", "25", "-i",
+             str(self.base / "pal.ppm"), "-t", "0.4", "-vf", "setsar=16/15", "-an", "-c:v", "libx264",
+             "-threads", "1", str(source)])
+        self.assertEqual(probe(source)["streams"][0]["sample_aspect_ratio"], "16:15")
+        for role in ("primary", "overlay"):
+            for fit in ("contain", "cover"):
+                with self.subTest(role=role, fit=fit):
+                    data = self.silent_visual()
+                    data["project"].update(width=640, height=360, duration_ms=400, background="#000000")
+                    data["assets"]["pal"] = {**data["assets"]["green"], "path": "pal.mp4"}
+                    data["shots"][0].update(asset_id="pal" if role == "primary" else "red", end_ms=400, fit=fit)
+                    if role == "overlay":
+                        data["overlays"] = [{"id": "pal", "asset_id": "pal", "role": "element", "start_ms": 0,
+                                             "end_ms": 400, "x": 0, "y": 0, "width": 640, "height": 360,
+                                             "fit": fit, "purpose": "display ratio", "decision": "preserve non-square pixels"}]
+                    output = self.base / f"pal-{role}-{fit}.mp4"
+                    render(data, self.base, output)
+                    result = subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-ss", "0.2", "-i", str(output),
+                                             "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], capture_output=True, check=True)
+                    def green(x, y):
+                        pixel = result.stdout[(y * 640 + x) * 3:(y * 640 + x) * 3 + 3]
+                        return pixel[1] > 150 and pixel[0] < 80
+                    green_width = sum(green(x, 180) for x in range(640))
+                    green_height = sum(green(320, y) for y in range(360))
+                    expected = (160, 120) if fit == "contain" else (213, 160)
+                    self.assertLessEqual(abs(green_width - expected[0]), 2, (role, fit, green_width))
+                    self.assertLessEqual(abs(green_height - expected[1]), 2, (role, fit, green_height))
+                    if role == "primary" and fit == "contain":
+                        bounds = [x for x in range(640) if max(result.stdout[(180 * 640 + x) * 3:(180 * 640 + x) * 3 + 3]) > 100]
+                        self.assertEqual((bounds[0], bounds[-1]), (80, 559))
 
     def test_real_export_with_chinese_paths_trim_captions_and_audio(self):
         output = self.base / "result 视频.mp4"

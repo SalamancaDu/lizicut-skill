@@ -90,7 +90,7 @@ def asset_path(base: Path, asset: dict) -> Path:
 
 def probe(path: Path) -> dict:
     output = run([executable("ffprobe"), "-v", "error", "-show_entries",
-                  "format=duration,size,start_time:stream=codec_type,codec_name,width,height,start_time,duration,duration_ts,time_base,avg_frame_rate,sample_rate,channels,nb_frames",
+                  "format=duration,size,start_time:stream=codec_type,codec_name,width,height,sample_aspect_ratio,display_aspect_ratio,pix_fmt,start_time,duration,duration_ts,time_base,avg_frame_rate,sample_rate,channels,nb_frames:stream_tags=alpha_mode",
                   "-of", "json", str(path)])
     return json.loads(output)
 

@@ -59,7 +59,7 @@
 - `audio_mode` 为 narrated / original / nonverbal / silent。前两种分别要求增益大于零的 narration / original 声音轨；nonverbal 用于无解说的图文配乐，仅允许 BGM/SFX，且至少一条增益大于零；silent 要求没有声音轨。它不能从角色声明证明音源含真实语音。静音 MP4 包含静音 AAC 轨，避免播放端行为不一致。
 - assets 的 kind 为 image / video / audio / subtitle。source_type 为 user / document / stock / generated / designed / synthetic_audio；usage 为 evidence / illustration。`generated` 和 `synthetic_audio` 不得充当事实证据；原样素材和自制图表的来源仍需人核查。
 - 每镜的 carrier 为 host / footage / graphic，information_shape 为解释关系名称，不是互斥模板资格。purpose 与 decision 用于保留剪辑理由，合成器不会把这些自然语言自动转成动作。
-- 图片持续到镜头结束。视频从 source_in_ms 播放，长度不足时报错。fit 为 contain（保全）或 cover（允许裁切）。loop 只有明确为 true 才循环，且从源文件零点开始；局部循环先制作裁好的素材。
+- 图片持续到镜头结束。视频从 source_in_ms 播放，长度不足时报错。fit 为 contain（保全）或 cover（允许裁切），按包含像素宽高比的显示比例适配，再输出方形像素；非方形像素视频不会直接按存储尺寸拉伸。主镜头的透明与半透明区域先和 project.background 合成，再编码为不透明 MP4；contain 留边也使用该背景色。loop 只有明确为 true 才循环，且从源文件零点开始；局部循环先制作裁好的素材。
 - 使用每个源文件的第一路视频/音频流，在容器共同起点下分别校验其起止位置；不把各流单独归零，也不拿较长的视频流掩盖较短声音流。原有音频延迟用静音保留；请求的视频范围早于第一帧或必要时间信息不明时先准备同步主素材。原有同步偏移与人为安排的时间线位置分别处理。
 - evidence_refs 引用 assets 中 usage=evidence 的素材；不能把插画引用成事实依据。来源地址记录在 source_ref，合成器不联网验证来源或下载。
 - 未知执行字段会报错，避免静默忽略尚未支持的效果。
@@ -91,6 +91,8 @@
 ```
 
 此片段应并入完整时间线，并在 assets 中声明真实的 `prepared-label` 图片/视频文件。role 为 element / template；位置与尺寸为项目像素，矩形不能越界。contain 的空余区透明，cover 会裁切。opacity 为 0—1；淡入与淡出相加不得超过图层长度。`source_in_ms`、`loop` 和 `evidence_refs` 与主画面含义相同。素材有 alpha 时保留透明区域；没有 alpha 的视频按不透明矩形处理，不执行自动抠图、圆角、移动、缩放或文字排版。这些效果先制作成所需素材。
+
+主镜头和叠层共用显示比例适配。标记 alpha_mode=1 的 VP8 / VP9 WebM 分别使用 libvpx / libvpx-vp9 解码器，避免默认解码器丢失透明通道；缺少所需解码器时在渲染前报出素材与能力缺口，先使用已有工具准备无损 RGBA 素材或补齐所需环境，不导出不透明替代品。PNG 原始 alpha、图层 opacity 和淡入淡出共同作用；普通黑底视频不会自动变透明。仍须检查实际导出的边缘、遮挡和可读性。
 
 ## 音轨
 

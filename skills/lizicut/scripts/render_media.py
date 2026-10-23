@@ -14,6 +14,38 @@ def sec(milliseconds: int) -> str:
     return f"{milliseconds / 1000:.6f}"
 
 
+def visual_fit(width: int, height: int, fit: str) -> str:
+    """Fit decoded display geometry in one scale, retaining transparent padding."""
+    # dar includes the decoded sample aspect ratio (and FFmpeg autorotation).
+    # Setting SAR only after this scale avoids stretching anamorphic footage.
+    if fit == "cover":
+        return (f"scale=w='max({width},ceil({height}*dar))':h='max({height},ceil({width}/dar))',"
+                f"setsar=1,crop={width}:{height}")
+    return (f"scale=w='max(1,min({width},round({height}*dar)))':h='max(1,min({height},round({width}/dar)))',"
+            f"setsar=1,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black@0")
+
+
+def alpha_decoders(infos: dict[str, dict], ffmpeg: str) -> dict[str, list[str]]:
+    """WebM alpha needs libvpx; native VP8/VP9 decoding can silently drop it."""
+    required = {}
+    for key, info in infos.items():
+        video = next(stream for stream in info["streams"] if stream["codec_type"] == "video")
+        tags = {name.lower(): str(value) for name, value in video.get("tags", {}).items()}
+        decoder = {"vp8": "libvpx", "vp9": "libvpx-vp9"}.get(video.get("codec_name"))
+        if tags.get("alpha_mode") == "1" and decoder:
+            required[key] = decoder
+    if not required:
+        return {}
+    listing = run([ffmpeg, "-hide_banner", "-decoders"])
+    available = {fields[1] for line in listing.splitlines()
+                 if len(fields := line.split()) > 1 and fields[0].startswith("V")}
+    for key, decoder in required.items():
+        if decoder not in available:
+            raise LizicutError(f"assets.{key}: alpha_mode=1 requires FFmpeg decoder {decoder}; "
+                               "use a build with this decoder or prepare a lossless RGBA source before rendering")
+    return {key: ["-c:v", decoder] for key, decoder in required.items()}
+
+
 def duck_expression(track: dict, voices: list[dict]) -> str | None:
     """A scheduled envelope; this is not speech activity detection."""
     attack = track.get("duck_attack_ms", 80)
@@ -117,6 +149,8 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
     sources = [asset_path(base, asset) for asset in data["assets"].values()]
     ensure_output(output, sources, overwrite)
     ffmpeg = executable("ffmpeg")
+    visual_ids = {entry["asset_id"] for entry in [*data["shots"], *data.get("overlays", [])]}
+    decoders = alpha_decoders({key: source_infos[key] for key in visual_ids}, ffmpeg)
     output.parent.mkdir(parents=True, exist_ok=True)
     width, height, fps = project["width"], project["height"], project["fps"]
     color = "0x" + project.get("background", "#20221f")[1:]
@@ -137,14 +171,14 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
                 command += ["-stream_loop", "-1"]
             if shot.get("source_in_ms", 0):
                 command += ["-ss", sec(shot["source_in_ms"])]
-            command += ["-i", str(asset_path(base, asset))]
-            if shot.get("fit", "contain") == "cover":
-                scaling = f"scale={width}:{height}:force_original_aspect_ratio=increase,crop={width}:{height}"
-            else:
-                scaling = f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color={color}"
+            command += [*decoders.get(shot["asset_id"], []), "-i", str(asset_path(base, asset))]
+            scaling = visual_fit(width, height, shot.get("fit", "contain"))
             frames = (shot["end_ms"] - shot["start_ms"]) * fps // 1000
             name = f"part{index:04}.mp4"
-            command += ["-an", "-vf", f"setpts=PTS-STARTPTS,{scaling},setsar=1,fps={fps},format=yuv420p", "-frames:v", str(frames),
+            graph = (f"color=c={color}:s={width}x{height}:r={fps},format=rgba[canvas];"
+                     f"[0:v:0]setpts=PTS-STARTPTS,fps={fps},format=rgba,{scaling}[shot];"
+                     "[canvas][shot]overlay=shortest=1:format=auto:alpha=straight,format=yuv420p[outv]")
+            command += ["-an", "-filter_complex", graph, "-map", "[outv]", "-frames:v", str(frames),
                         "-c:v", "libx264", "-preset", "fast", "-crf", "19", "-threads", str(threads), name]
             run(command, cwd=work)
             actual_frames = probe(work / name)["streams"][0].get("nb_frames")
@@ -197,13 +231,10 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
             if layer.get("source_in_ms", 0):
                 command += ["-ss", sec(layer["source_in_ms"])]
             duration = layer["end_ms"] - layer["start_ms"]
-            command += ["-t", sec(duration), "-i", str(asset_path(base, asset))]
+            command += ["-t", sec(duration), *decoders.get(layer["asset_id"], []), "-i", str(asset_path(base, asset))]
             w, h = layer["width"], layer["height"]
-            if layer.get("fit", "contain") == "cover":
-                scaling = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}"
-            else:
-                scaling = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black@0"
-            chain = [f"[{input_index}:v:0]trim=duration={sec(duration)}", "setpts=PTS-STARTPTS", f"fps={fps}", "format=rgba", scaling, "setsar=1", f"colorchannelmixer=aa={layer.get('opacity', 1)}"]
+            scaling = visual_fit(w, h, layer.get("fit", "contain"))
+            chain = [f"[{input_index}:v:0]trim=duration={sec(duration)}", "setpts=PTS-STARTPTS", f"fps={fps}", "format=rgba", scaling, f"colorchannelmixer=aa={layer.get('opacity', 1)}"]
             if layer.get("fade_in_ms", 0):
                 chain.append(f"fade=t=in:st=0:d={sec(layer['fade_in_ms'])}:alpha=1")
             if layer.get("fade_out_ms", 0):

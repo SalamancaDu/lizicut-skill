@@ -227,7 +227,7 @@ def measured(path: Path, request: dict, candidate: dict) -> dict:
 
 def fetch_download(url: str, target, max_bytes: int, timeout: int) -> tuple[str, int, str, str]:
     """Worker-side bounded streaming; the parent enforces the hard wall clock."""
-    request = urllib.request.Request(http_url(url), headers={"User-Agent": "lizicut-materials/0.1.5", "Accept-Encoding": "identity"})
+    request = urllib.request.Request(http_url(url), headers={"User-Agent": "lizicut-materials/0.1.6", "Accept-Encoding": "identity"})
     deadline = time.monotonic() + timeout
     try:
         with urllib.request.build_opener(Redirects()).open(request, timeout=timeout) as response:

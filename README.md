@@ -2,9 +2,9 @@
 
 把“这段话应该怎样剪”变成智能体可以执行的判断：先找解释任务，再组织画面、素材、声音与时间。默认以财经科普为主要场景，也支持商业分析、公司/行业机制和其他解释型内容。
 
-当前版本为 **v0.1.5**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
+当前版本为 **v0.1.6**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
 
-[下载 v0.1.5](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.1.5) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
+[下载 v0.1.6](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.1.6) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
 
 ## 从这里开始
 
@@ -35,7 +35,7 @@
 - 口播粗剪覆盖重录择优、语义重复、自我纠正、呼吸与跳切取舍。智能体根据实际声音和转录作决定，助手按计划保留/删除，同步视频、原声、字幕与切口位置；不自动判定语义。
 - 素材流程覆盖需求检索、候选核验与择优、本地导入/直链下载、文件哈希复用、来源与使用状态记录，以及镜头回填。检索依赖当前可用工具；助手不冒充跨站语义搜索器。
 - 自带 Python 标准库助手：环境检查、时间线校验、粗剪字幕重映射、图片/视频主画面、独立透明叠层及淡入淡出、SRT 烧录、音轨 trim/loop/fade/mix/duck、MP4 导出与解码检查。
-- 本地合成需要已经安装的 FFmpeg 和 ffprobe；烧录字幕需要其 libass 支持。字体使用本机字体，不随包分发系统字体。
+- 本地合成需要已经安装的 FFmpeg 和 ffprobe；烧录字幕需要其 libass 支持。透明 VP8/VP9 WebM 需分别具有 libvpx / libvpx-vp9 解码器，缺少时会在导出前报告。字体使用本机字体，不随包分发系统字体。
 - 搜索、转录、配音、生成素材和复杂动画使用当前环境已有且获授权的工具。缺少这些工具时，Skill 会说明实际缺口；它不捏造已生成素材或已导出视频。
 
 助手使用说明见 [执行与时间线](skills/lizicut/references/execution.md)。
@@ -66,8 +66,11 @@ v0.1.4 修复三处执行问题：保留源文件原有声画偏移和尾部；�
 
 v0.1.5 是首次公开发布，包含上述功能与修复，补齐 GitHub 下载及安装说明。沿用 v0.1.4 已通过的14项针对性测试结果；本次发布整理未改变剪辑、下载或恢复逻辑。
 
+v0.1.6 修复三处画面合成问题：透明主镜头先与项目背景合成；带 alpha 标记的 VP8/VP9 WebM 显式使用可保留透明度的解码器；主镜头和叠层按含像素比例的显示比例适配，避免非方形像素变形。本版通过5项针对性媒体测试和5项粗剪回归，实际导出并检查透明/半透明像素、图层淡入淡出、contain/cover 尺寸及声画源时钟；也验证了缺少 alpha 解码器会提前失败。测试使用自制夹具，不替代真实成片审阅。
+
 ```text
 python skills/lizicut/scripts/lizicut.py doctor
+python -m unittest discover -s tests -p test_media.py -k primary_png -k webm_alpha -k anamorphic -k real_export -k layers_have -v
 python -m unittest discover -s tests -p test_roughcut.py -v
 python -m unittest discover -s tests -p test_materials.py -v
 python scripts/check_project.py
