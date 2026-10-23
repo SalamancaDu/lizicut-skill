@@ -2,9 +2,9 @@
 
 把“这段话应该怎样剪”变成智能体可以执行的判断：先找解释任务，再组织画面、素材、声音与时间。默认以财经科普为主要场景，也支持商业分析、公司/行业机制和其他解释型内容。
 
-当前版本为 **v0.1.7**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
+当前版本为 **v0.2.0**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
 
-[下载 v0.1.7](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.1.7) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
+[下载 v0.2.0](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.2.0) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
 
 ## 从这里开始
 
@@ -14,6 +14,10 @@
 | 文案和录音 | `使用 $lizicut，以这份录音为时钟，完成素材、字幕、音画编排并导出成片。` |
 | 主播视频 | `使用 $lizicut，保留我的观点和自然停顿，先粗剪，再补必要的解释画面。` |
 | 已有项目，需要修改 | `使用 $lizicut，只修改这段机制解释，沿用现有品牌、素材和时间线。` |
+
+默认执行端是 Premiere Pro：先确认文稿和录音，再在独立工程/序列副本中完成口播粗剪、素材导入、图层与动效、字幕和声音对齐，最后由 PR 保存工程并提交导出。推荐使用具备本地 CEP 桥接的 [PremiereMCP](https://github.com/DutchErwin/PremiereMCP)；Skill 会先发现当前 MCP 的真实工具和参数，不把某个服务器名称当作固定接口。PS、Illustrator 和 After Effects 是按镜头需要选择的协作分支，保留可编辑源文件并将实际交接素材回到 PR。
+
+PR 的编码导出依赖 Adobe Media Encoder 或当前 MCP 的实际导出能力。MCP 返回“已入队”不等于 MP4 已完成；必须检查输出文件、完整解码和首中尾同步。没有可用 AME 时，报告导出缺口，不悄悄用 FFmpeg 代替 PR 成片。
 
 也可在安装前，直接让智能体读取本项目的 [SKILL.md](skills/lizicut/SKILL.md) 并按它执行。内容、文件路径和交付终点说清楚即可，不要求用户自己选择内部阶段。
 
@@ -37,6 +41,8 @@
 - 自带 Python 标准库助手：环境检查、时间线校验、粗剪字幕重映射、图片/视频主画面、独立透明叠层及淡入淡出、SRT 烧录、音轨 trim/loop/fade/mix/duck、MP4 导出与解码检查。
 - 本地合成需要已经安装的 FFmpeg 和 ffprobe；烧录字幕需要其 libass 支持。透明 VP8/VP9 WebM 需分别具有 libvpx / libvpx-vp9 解码器，缺少时会在导出前报告。字体使用本机字体，不随包分发系统字体。
 - 搜索、转录、配音、生成素材和复杂动画使用当前环境已有且获授权的工具。缺少这些工具时，Skill 会说明实际缺口；它不捏造已生成素材或已导出视频。
+- PR 主流程覆盖文稿/录音确认、项目与序列核对、真实源区间粗剪、素材导入、字幕轨、关键帧、标记、保存和导出前检查；[Premiere 执行](skills/lizicut/references/premiere.md)记录状态回读、中文界面组件名、跨工程防错和 AME 导出边界。
+- PS/Illustrator/AE 协作保留分层 PSD、AI、AEP 与实际交接素材；当前本机已实测 Photoshop 与 After Effects 脚本路径，Illustrator 仅定义了可选交接规则，未声称已有专用 MCP。
 
 助手使用说明见 [执行与时间线](skills/lizicut/references/execution.md)。
 
@@ -69,6 +75,8 @@ v0.1.5 是首次公开发布，包含上述功能与修复，补齐 GitHub 下�
 v0.1.6 修复三处画面合成问题：透明主镜头先与项目背景合成；带 alpha 标记的 VP8/VP9 WebM 显式使用可保留透明度的解码器；主镜头和叠层按含像素比例的显示比例适配，避免非方形像素变形。本版通过5项针对性媒体测试和5项粗剪回归，实际导出并检查透明/半透明像素、图层淡入淡出、contain/cover 尺寸及声画源时钟；也验证了缺少 alpha 解码器会提前失败。测试使用自制夹具，不替代真实成片审阅。
 
 v0.1.7 修复动画入场丢首帧、非整毫秒帧周期无法逐帧编排及字幕预算缺失。时间线增加 duration_frames 与 start_frame/end_frame，兼容既有毫秒字段；粗剪可使用帧边界计算的小数毫秒，音视频与字幕保持同一映射。不可见字幕和显式行数超限会提前报错，自动换行/块高度估算、阅读速度与停留超限会逐条告警，智能体据真实声音与画面修复。本版47项相关检查通过：27项时间线/字幕、14项实际媒体集成、6项粗剪；覆盖24/25/30/60fps、1.160秒入场首帧、分数毫秒源裁切、音效落点、字幕预检及末帧SRT精度。验证范围为本地自制媒体。
+
+v0.2.0 将 PR 设为主执行端，增加文稿/录音确认节点、Premiere MCP 的发现/回读/序列副本/粗剪/素材上轨/字幕/关键帧/标记/保存/导出前检查，以及 PS/Illustrator/AE 可选协作。真实 PR 测试工程已验证 12.96 秒源素材按 `[0,3.6)` 与 `[7.2,12.96)` 重建为 9.36 秒，导入 PS 定版与 AE 透明动效，创建字幕轨、音乐轨和关键帧，实际导出静帧并通过无离线素材/无空隙检查。当前环境缺少可运行的 Adobe Media Encoder，PR 导出任务只能确认已入队，不能把它写成 MP4 成功；见 [v0.2.0 复核](docs/review-v0.2.0.md)。
 
 ```text
 python skills/lizicut/scripts/lizicut.py doctor

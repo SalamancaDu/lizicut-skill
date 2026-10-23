@@ -1,4 +1,4 @@
 interface:
   display_name: "Lizicut 剪辑"
-  short_description: "按李子的剪辑思路完成文案、镜头、素材、音画编排与成片交付"
-  default_prompt: "使用 $lizicut，按我的文案和已有素材完成解释型视频剪辑，并交付本轮要求的方案、资产或成片。"
+  short_description: "按李子的剪辑思路，以 PR 完成文稿录音确认、粗剪、素材、动效与成片交付"
+  default_prompt: "使用 $lizicut，确认文稿和录音后，通过可用 MCP 在 Premiere Pro 中完成剪辑，按需协作 PS/Illustrator/AE，并交付可编辑工程和成片。"
