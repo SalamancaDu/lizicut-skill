@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from render_media import ensure_output, render, sec
-from timeline import LizicutError, asset_path, choice, executable, integer, obj, probe, read_srt, retime, run, stream_duration_ms, stream_window_ms, text, validate, write_srt
+from timeline import LizicutError, asset_path, choice, executable, frame_index, frame_time, integer, obj, probe, read_srt, retime, run, stream_duration_ms, stream_window_ms, text, time_value, validate, write_srt
 
 
 def overlaps(left: dict, right: dict) -> bool:
@@ -17,8 +17,8 @@ def overlaps(left: dict, right: dict) -> bool:
 
 def time_range(raw: object, context: str, duration: int) -> dict:
     item = obj(raw, context, {"start_ms", "end_ms"})
-    start = integer(item.get("start_ms"), context + ".start_ms")
-    end = integer(item.get("end_ms"), context + ".end_ms", start + 1, duration)
+    start = time_value(item.get("start_ms"), context + ".start_ms")
+    end = time_value(item.get("end_ms"), context + ".end_ms", start + 0.001, duration)
     return {"start_ms": start, "end_ms": end}
 
 
@@ -32,7 +32,7 @@ def compile_plan(plan: dict, base: Path, *, media: bool = True) -> dict:
     text(source.get("source_ref"), "roughcut.source.source_ref")
     source_type = choice(source.get("source_type", "user"), {"user", "document", "stock", "generated", "designed", "synthetic_audio"}, "roughcut.source.source_type")
     source_path = asset_path(base, source)
-    duration = integer(plan.get("source_duration_ms"), "roughcut.source_duration_ms", 1)
+    duration = time_value(plan.get("source_duration_ms"), "roughcut.source_duration_ms", 1)
     fade = integer(plan.get("splice_fade_ms", 5), "roughcut.splice_fade_ms", 0, 20)
     source_timing = {}
     if media:
@@ -102,11 +102,23 @@ def compile_plan(plan: dict, base: Path, *, media: bool = True) -> dict:
         kept.append({"start_ms": cursor, "end_ms": duration})
     if not kept:
         raise LizicutError("roughcut: no source material remains")
+    video = None
+    if kind == "video":
+        video = obj(plan.get("video"), "roughcut.video", {"width", "height", "fps"})
+        fps = integer(video.get("fps"), "roughcut.video.fps", 1, 60)
+        kept = [{field: frame_time(frame_index(item[field], fps, "roughcut.video source"), fps)
+                 for field in ("start_ms", "end_ms")} for item in kept]
+        duration = frame_time(frame_index(duration, fps, "roughcut.video source duration"), fps)
     cuts = {"source_duration_ms": duration, "kept_ranges": kept}
-    mapping, joins, cursor = [], [], 0
+    mapping, joins, cursor, frame_cursor = [], [], 0, 0
     for index, item in enumerate(kept):
         length = item["end_ms"] - item["start_ms"]
-        mapping.append({**item, "output_start_ms": cursor, "output_end_ms": cursor + length})
+        if video is not None:
+            frame_cursor += frame_index(item["end_ms"], fps) - frame_index(item["start_ms"], fps)
+            output_end = frame_time(frame_cursor, fps)
+        else:
+            output_end = cursor + length
+        mapping.append({**item, "output_start_ms": cursor, "output_end_ms": output_end})
         if index:
             gap = {"start_ms": kept[index - 1]["end_ms"], "end_ms": item["start_ms"]}
             at_join = [deleted for deleted in removes if overlaps(deleted, gap)]
@@ -114,7 +126,7 @@ def compile_plan(plan: dict, base: Path, *, media: bool = True) -> dict:
                           "decision_ids": [deleted["id"] for deleted in at_join],
                           "visual_notes": [deleted["visual_note"] for deleted in at_join if "visual_note" in deleted],
                           "review": "Check whole words, breath, room tone, head/hand position and lip sync; cover is not automatically applied."})
-        cursor += length
+        cursor = output_end
     pending = []
     for item in retained:
         if item["action"] == "review":
@@ -131,10 +143,6 @@ def compile_plan(plan: dict, base: Path, *, media: bool = True) -> dict:
             raise LizicutError("roughcut.captions: no spoken captions remain; check the edit plan")
     timeline = None
     if kind == "video":
-        video = obj(plan.get("video"), "roughcut.video", {"width", "height", "fps"})
-        fps = integer(video.get("fps"), "roughcut.video.fps", 1, 60)
-        if any(item[field] * fps % 1000 for item in kept for field in ("start_ms", "end_ms")):
-            raise LizicutError("roughcut.video: source boundaries must be on the project frame grid; do not silently round speech cuts")
         timeline = {
             "version": "lizicut.timeline.v1",
             "project": {"title": title, **video, "duration_ms": cursor, "timing_basis": "aligned", "audio_mode": "original"},
@@ -143,7 +151,7 @@ def compile_plan(plan: dict, base: Path, *, media: bool = True) -> dict:
         for index, item in enumerate(mapping):
             start, end = item["output_start_ms"], item["output_end_ms"]
             timeline["shots"].append({"id": f"keep-{index + 1}", "asset_id": "source", "start_ms": start, "end_ms": end, "source_in_ms": item["start_ms"], "fit": "contain", "carrier": "host", "information_shape": "spoken_argument", "purpose": "保留已核对的完整表达", "decision": "按同一源区间同步剪切视频与原声；切口见 roughcut-map.json"})
-            edge_fade = min(fade, (end - start) // 2)
+            edge_fade = min(fade, int((end - start) // 2))
             timeline["audio"].append({"id": f"voice-{index + 1}", "asset_id": "source", "role": "original", "start_ms": start, "end_ms": end, "source_in_ms": item["start_ms"],
                                       "fade_in_ms": edge_fade if index else 0, "fade_out_ms": edge_fade if index + 1 < len(mapping) else 0})
         validate(timeline, base)
@@ -164,8 +172,8 @@ def render_audio(bundle: dict, output: Path) -> dict:
         names = []
         for index, interval in enumerate(bundle["mapping"]):
             length = interval["end_ms"] - interval["start_ms"]
-            fade = min(bundle["splice_fade_ms"], length // 2)
-            filters = ["aresample=48000:async=1:first_pts=0", f"atrim=duration={sec(length)}", "asetpts=PTS-STARTPTS"]
+            fade = min(bundle["splice_fade_ms"], int(length // 2))
+            filters = ["aresample=48000:async=1:first_pts=0", f"atrim=end_sample={round(length * 48)}", "asetpts=PTS-STARTPTS"]
             if index and fade:
                 filters.append(f"afade=t=in:d={sec(fade)}")
             if index + 1 < len(bundle["mapping"]) and fade:

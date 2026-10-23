@@ -20,6 +20,7 @@
 | packages/shared/src/lib/snapfilm/host-roughcut/roughcut-cut-profile-v1.ts | 不同强度的句头句尾保护、最短片段 | 列明原始参考量与适用前提，不声称复刻 ASR 算法 |
 | packages/shared/src/lib/snapfilm/host-roughcut/roughcut-rhythm-tier-policy-v1.ts | 共享停顿语义、按强度改变安全停顿删减预算 | 保留原则；不追求固定删减率 |
 | packages/shared/src/lib/snapfilm/host-roughcut/caption-timing-confidence-v1.ts | 低置信度降级，不把缺值视作高置信度 | 保留；辅助工具对跨切口字幕报出具体缺口 |
+| packages/shared/src/lib/snapfilm/caption-engine/quality/caption-quality-types.ts、packages/shared/src/lib/snapfilm/host-roughcut/caption-line-constraints-v1.ts、packages/shared/src/lib/snapfilm/host-roughcut/caption-duration-budget-v1.ts | 字幕阅读速度、行数/行宽、停留时间与置信度预算 | 保留为可调预算；按真实画幅、字体与语言判断，自动估算只给出待处理条目，不冒充精确字形测量或词时间 |
 | packages/shared/src/lib/snapfilm/host-roughcut/asr-transcript-repair-v1.ts | 重复串句/错挂尾巴修复，仅从已有 words 选择连续区间，不新增词 | 明确区分“修转写”与“剪原片”；重复提示不能当作真实重录或语义重复的删除证据 |
 | packages/shared/src/lib/snapfilm/host-roughcut/roughcut-filler-lexicon-v1.ts | 词元候选与整单元 filler 判断分开 | 词表只提示，补上指示词、强调、步骤连接词的保留条件 |
 | packages/shared/src/lib/snapfilm/host-roughcut/roughcut-safe-pause-eligibility-v1.ts | 字幕敏感、语义、慢节奏、修复敏感与外部保护先于停顿压缩 | 保留分类/保护思路；正常呼吸与弱读不按低电平直接删除 |
@@ -50,5 +51,7 @@ v0.1.3 补强素材检索链路，按上述 search/runtime/import 源码确认�
 v0.1.4 修正本包执行器的三处问题：按共同源时钟保留音视频起始偏移并校验结束位置；素材取得前及每槽位后提交检查点、恢复同计划已完成文件；HTTP(S)取得由可终止的独立进程执行总超时。对应验证使用有延迟与非零容器起点的合成音视频、受控中断/残留清单和本机慢响应夹具，不冒充真实口播听感或外部素材库验收。
 
 v0.1.6 修正本包新增合成器的透明度和显示比例处理：主镜头在丢弃 alpha 前与项目背景合成；识别 VP8/VP9 WebM 的 alpha 标记并选择对应 libvpx 解码器，缺失时提前报告；contain/cover 将非方形像素计入显示比例。自制 PNG、透明 WebM 与 720×576 SAR 16:15 视频的实际导出像素和尺寸验证了这些行为，并复核原有粗剪声画映射；这些修复不是原项目已有能力的还原证明。
+
+v0.1.7 补齐上述字幕阅读预算及超载处理路径，并修正本包执行器的帧时序：显式帧号可表达24/30/60fps的每帧；叠层以整数帧入场，避免1.160秒等位置丢掉首状态；粗剪支持精确小数毫秒并按帧累计。音频保留真实源区间，SRT 仅在输出时按毫秒精度处理。不可见字幕与显式行数超限提前报错，估算换行、块高度、阅读速度和停留超限给出条目告警。自制媒体验证技术行为，不替代真实口播听感与解释效果审阅。
 
 v0.1.1 复审时还核对了 `audio-branch.ts`（无录音不强制生成）、`image-source-policy.ts`（可配置来源/导入能力）、`template-subtitle-policy-surface-v1.ts`（字幕安全区和预览/导出职责）、`default-motion-strategy-v1.ts`（按场景委托动作规划）。本包保留输入分支、真实能力检查、字幕独立与动作职责，不迁移供应商、数据库开关和模板编辑器协议。

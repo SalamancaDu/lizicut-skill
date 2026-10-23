@@ -2,9 +2,9 @@
 
 把“这段话应该怎样剪”变成智能体可以执行的判断：先找解释任务，再组织画面、素材、声音与时间。默认以财经科普为主要场景，也支持商业分析、公司/行业机制和其他解释型内容。
 
-当前版本为 **v0.1.6**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
+当前版本为 **v0.1.7**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
 
-[下载 v0.1.6](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.1.6) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
+[下载 v0.1.7](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.1.7) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
 
 ## 从这里开始
 
@@ -68,9 +68,12 @@ v0.1.5 是首次公开发布，包含上述功能与修复，补齐 GitHub 下�
 
 v0.1.6 修复三处画面合成问题：透明主镜头先与项目背景合成；带 alpha 标记的 VP8/VP9 WebM 显式使用可保留透明度的解码器；主镜头和叠层按含像素比例的显示比例适配，避免非方形像素变形。本版通过5项针对性媒体测试和5项粗剪回归，实际导出并检查透明/半透明像素、图层淡入淡出、contain/cover 尺寸及声画源时钟；也验证了缺少 alpha 解码器会提前失败。测试使用自制夹具，不替代真实成片审阅。
 
+v0.1.7 修复动画入场丢首帧、非整毫秒帧周期无法逐帧编排及字幕预算缺失。时间线增加 duration_frames 与 start_frame/end_frame，兼容既有毫秒字段；粗剪可使用帧边界计算的小数毫秒，音视频与字幕保持同一映射。不可见字幕和显式行数超限会提前报错，自动换行/块高度估算、阅读速度与停留超限会逐条告警，智能体据真实声音与画面修复。本版47项相关检查通过：27项时间线/字幕、14项实际媒体集成、6项粗剪；覆盖24/25/30/60fps、1.160秒入场首帧、分数毫秒源裁切、音效落点、字幕预检及末帧SRT精度。验证范围为本地自制媒体。
+
 ```text
 python skills/lizicut/scripts/lizicut.py doctor
-python -m unittest discover -s tests -p test_media.py -k primary_png -k webm_alpha -k anamorphic -k real_export -k layers_have -v
+python -m unittest discover -s tests -p test_timeline.py -v
+python -m unittest discover -s tests -p test_media.py -v
 python -m unittest discover -s tests -p test_roughcut.py -v
 python -m unittest discover -s tests -p test_materials.py -v
 python scripts/check_project.py

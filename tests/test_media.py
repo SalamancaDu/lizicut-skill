@@ -73,6 +73,102 @@ class MediaTests(unittest.TestCase):
         data["assets"]["background"] = {**data["assets"]["red"], "path": "background.ppm"}
         return data
 
+    def test_legacy_overlay_first_frame_survives_the_1160ms_onset(self):
+        run([shutil.which("ffmpeg"), "-v", "error", "-nostdin", "-f", "lavfi", "-i",
+             "color=c=blue:s=80x40:r=25,drawbox=c=red:t=fill:enable='lt(n,1)'", "-frames:v", "10",
+             "-an", "-c:v", "libx264", "-threads", "1", str(self.base / "event.mp4")])
+        for start in (1000, 1160):
+            with self.subTest(start=start):
+                data = self.silent_visual()
+                data["project"]["duration_ms"] = data["shots"][0]["end_ms"] = 2000
+                data["shots"][0]["asset_id"] = "background"
+                data["assets"]["event"] = {**data["assets"]["green"], "path": "event.mp4"}
+                data["overlays"] = [{"id": "event", "asset_id": "event", "role": "template", "start_ms": start,
+                                     "end_ms": start + 400, "x": 0, "y": 0, "width": 80, "height": 40,
+                                     "purpose": "first state at keyword", "decision": "retain the red first frame"}]
+                output = self.base / f"event-{start}.mp4"
+                render(data, self.base, output)
+                raw = subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-i", str(output), "-f", "rawvideo",
+                                      "-pix_fmt", "rgb24", "pipe:1"], capture_output=True, check=True).stdout
+                pixels = [raw[(frame * 320 * 180 + 20 * 320 + 40) * 3:(frame * 320 * 180 + 20 * 320 + 40) * 3 + 3] for frame in range(50)]
+                self.assertEqual([i for i, p in enumerate(pixels) if p[0] > 150 and p[1] < 70], [start // 40])
+                self.assertEqual([i for i, p in enumerate(pixels) if p[2] > 150 and p[0] < 70], list(range(start // 40 + 1, start // 40 + 10)))
+
+    def test_frame_boundaries_and_audio_schedule_export_at_24_25_30_60fps(self):
+        for fps in (24, 25, 30, 60):
+            with self.subTest(fps=fps):
+                source = self.base / f"event-{fps}fps.mp4"
+                run([shutil.which("ffmpeg"), "-v", "error", "-nostdin", "-f", "lavfi", "-i",
+                     f"color=c=blue:s=80x40:r={fps},drawbox=c=red:t=fill:enable='lt(n,1)'", "-frames:v", "6",
+                     "-an", "-c:v", "libx264", "-threads", "1", str(source)])
+                data = self.silent_visual()
+                data["project"].pop("duration_ms")
+                data["project"].update(fps=fps, duration_frames=fps, audio_mode="nonverbal")
+                first = {key: value for key, value in data["shots"][0].items() if key not in {"start_ms", "end_ms"}}
+                data["shots"] = [{**first, "start_frame": 0, "end_frame": 1},
+                                 {**first, "id": "rest", "asset_id": "background", "start_frame": 1, "end_frame": fps}]
+                data["assets"]["event"] = {**data["assets"]["green"], "path": source.name}
+                data["overlays"] = [{"id": "event", "asset_id": "event", "role": "element", "start_frame": 5,
+                                     "end_frame": 9, "x": 0, "y": 0, "width": 80, "height": 40,
+                                     "purpose": "one exact frame", "decision": "no rounded millisecond boundary"}]
+                start = 5000 / fps
+                data["audio"] = [{"id": "event-sound", "asset_id": "tone", "role": "sfx", "start_ms": start,
+                                  "end_ms": start + 80, "source_in_ms": 100}]
+                original = copy.deepcopy(data)
+                output = self.base / f"frames-{fps}.mp4"
+                report = render(data, self.base, output)
+                self.assertEqual(int(report["frames"]), fps)
+                self.assertEqual(data, original)
+                raw = subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-i", str(output), "-f", "rawvideo",
+                                      "-pix_fmt", "rgb24", "pipe:1"], capture_output=True, check=True).stdout
+                def pixel(frame, x=40, y=20):
+                    offset = (frame * 320 * 180 + y * 320 + x) * 3
+                    return raw[offset:offset + 3]
+                self.assertGreater(pixel(0, 160, 90)[0], 150)
+                self.assertGreater(pixel(1, 160, 90)[1], 150)
+                self.assertGreater(pixel(4)[1], 150)
+                self.assertGreater(pixel(5)[0], 180)
+                self.assertGreater(pixel(6)[2], 180)
+                self.assertGreater(pixel(8)[2], 180)
+                self.assertGreater(pixel(9)[1], 150)
+                pcm = subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-i", str(output), "-vn", "-ac", "1",
+                                      "-ar", "48000", "-f", "f32le", "pipe:1"], capture_output=True, check=True).stdout
+                samples = array.array("f", pcm)
+                first_sound = next(i for i, value in enumerate(samples) if abs(value) > 0.035) / 48
+                self.assertLess(abs(first_sound - start), 10)
+
+    def test_caption_preflight_rejects_hidden_or_excess_lines_and_renders_a_repair(self):
+        data = self.silent_visual()
+        data["captions"] = {"asset_id": "srt", "font_name": "sans-serif", "font_size": 20, "margin_bottom": 16}
+        for name, cue, message in (
+            ("hidden", {"start_ms": 10, "end_ms": 30, "text": "Hidden"}, "no visible video frame"),
+            ("overflow", {"start_ms": 0, "end_ms": 1000, "text": "\n".join("Line " + str(i) for i in range(8))}, "explicit lines exceed")):
+            write_srt([cue], self.base / "captions.srt")
+            output = self.base / f"{name}.mp4"
+            with self.assertRaisesRegex(LizicutError, message):
+                render(data, self.base, output)
+            self.assertFalse(output.exists())
+            self.assertEqual(list(self.base.glob(".lizicut-*")), [])
+        write_srt([{"start_ms": 0, "end_ms": 1000, "text": "Sales rise\nProfit falls"}], self.base / "captions.srt")
+        output = self.base / "repaired-captions.mp4"
+        report = render(data, self.base, output)
+        self.assertEqual(report["warnings"], [])
+        raw = subprocess.run([shutil.which("ffmpeg"), "-v", "error", "-ss", "0.4", "-i", str(output), "-frames:v", "1",
+                              "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], capture_output=True, check=True).stdout
+        white_rows = [y for y in range(180) if sum(min(raw[(y * 320 + x) * 3:(y * 320 + x) * 3 + 3]) > 170 for x in range(320)) > 2]
+        self.assertTrue(white_rows)
+        self.assertGreater(min(white_rows), 0)
+        self.assertLess(max(white_rows), 180 - 16)
+        # A rounded SRT endpoint can exceed a fractional last frame by <=0.5ms.
+        data["project"].pop("duration_ms")
+        data["project"].update(fps=30, duration_frames=59)
+        data["shots"][0].pop("start_ms")
+        data["shots"][0].pop("end_ms")
+        data["shots"][0].update(start_frame=0, end_frame=59)
+        write_srt([{"start_ms": 0, "end_ms": 1967, "text": "Preserved tail"}], self.base / "captions.srt")
+        report = render(data, self.base, self.base / "fractional-caption-tail.mp4")
+        self.assertEqual(int(report["frames"]), 59)
+
     def test_primary_png_composites_zero_and_partial_alpha_on_project_background(self):
         alpha_png(self.base / "alpha.png")
         for fit in ("contain", "cover"):

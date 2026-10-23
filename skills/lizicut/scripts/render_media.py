@@ -7,11 +7,11 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from timeline import LizicutError, asset_path, duration_ms, executable, probe, read_srt, run, stream_window_ms, validate, validate_media
+from timeline import LizicutError, asset_path, caption_warnings, duration_ms, executable, frame_index, normalize_timing, probe, read_srt, run, stream_window_ms, validate, validate_media
 
 
-def sec(milliseconds: int) -> str:
-    return f"{milliseconds / 1000:.6f}"
+def sec(milliseconds: float) -> str:
+    return f"{milliseconds / 1000:.9f}"
 
 
 def visual_fit(width: int, height: int, fit: str) -> str:
@@ -97,7 +97,7 @@ def write_ass(data: dict, base: Path, target: Path) -> None:
         f"PlayResX: {project['width']}\nPlayResY: {project['height']}\nWrapStyle: 0\n"
         "[V4+ Styles]\n"
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{captions.get('font_name', 'sans-serif')},{captions.get('font_size', 32)},&H00FFFFFF,&H00FFFFFF,&H00151515,&H80000000,0,0,0,0,100,100,0,0,1,2,0,2,40,40,{captions.get('margin_bottom', 36)},1\n"
+        f"Style: Default,{captions.get('font_name', 'sans-serif')},{captions.get('font_size', 32)},&H00FFFFFF,&H00FFFFFF,&H00151515,&H80000000,0,0,0,0,100,100,0,0,1,2,0,2,{captions.get('margin_side', 40)},{captions.get('margin_side', 40)},{captions.get('margin_bottom', 36)},1\n"
         "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
     events = []
@@ -136,11 +136,13 @@ def ensure_output(path: Path, sources: list[Path], overwrite: bool) -> None:
 
 
 def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, threads: int = 2) -> dict:
+    data = normalize_timing(data)
     warnings = validate(data, base)
     project = data["project"]
     if project["timing_basis"] == "estimated":
         raise LizicutError("Cannot render final video with estimated timing; align foreground sound or author a fixed-duration nonverbal/silent film")
     source_infos = validate_media(data, base)
+    warnings.extend(caption_warnings(data, base))
     output = output.resolve()
     if output.suffix.lower() != ".mp4":
         raise LizicutError("Output must end in .mp4 (H.264 video and AAC audio)")
@@ -153,6 +155,7 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
     decoders = alpha_decoders({key: source_infos[key] for key in visual_ids}, ffmpeg)
     output.parent.mkdir(parents=True, exist_ok=True)
     width, height, fps = project["width"], project["height"], project["fps"]
+    total_frames = frame_index(project["duration_ms"], fps)
     color = "0x" + project.get("background", "#20221f")[1:]
     common = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-filter_threads", "1", "-filter_complex_threads", "1"]
     # Only this newly-created temporary directory is cleaned up, including on failure.
@@ -173,7 +176,7 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
                 command += ["-ss", sec(shot["source_in_ms"])]
             command += [*decoders.get(shot["asset_id"], []), "-i", str(asset_path(base, asset))]
             scaling = visual_fit(width, height, shot.get("fit", "contain"))
-            frames = (shot["end_ms"] - shot["start_ms"]) * fps // 1000
+            frames = frame_index(shot["end_ms"], fps) - frame_index(shot["start_ms"], fps)
             name = f"part{index:04}.mp4"
             graph = (f"color=c={color}:s={width}x{height}:r={fps},format=rgba[canvas];"
                      f"[0:v:0]setpts=PTS-STARTPTS,fps={fps},format=rgba,{scaling}[shot];"
@@ -202,7 +205,7 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
                 if track.get("source_in_ms", 0):
                     command += ["-ss", sec(track["source_in_ms"])]
                 command += ["-t", sec(duration), "-i", str(asset_path(base, data["assets"][track["asset_id"]]))]
-            chain = [f"[{index}:a:0]aresample=48000:async=1:first_pts=0", f"atrim=duration={sec(duration)}", "asetpts=PTS-STARTPTS", f"volume={track.get('gain', 1)}"]
+            chain = [f"[{index}:a:0]aresample=48000:async=1:first_pts=0", f"atrim=end_sample={round(duration * 48)}", "asetpts=PTS-STARTPTS", f"volume={track.get('gain', 1)}"]
             if "duck_gain" in track:
                 expression = duck_expression(track, voices)
                 if expression:
@@ -212,14 +215,14 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
                 chain.append(f"afade=t=in:st=0:d={sec(fade_in)}")
             if fade_out:
                 chain.append(f"afade=t=out:st={sec(duration - fade_out)}:d={sec(fade_out)}")
-            chain.append(f"adelay={track['start_ms']}:all=1[a{index}]")
+            chain.append(f"adelay={round(track['start_ms'] * 48)}S:all=1[a{index}]")
             filters.append(",".join(chain))
             labels.append(f"[a{index}]")
         total = sec(project["duration_ms"])
         filters.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={total}[silence]")
         mix_inputs = "[silence]" + "".join(labels)
         filters.append(f"{mix_inputs}amix=inputs={len(labels) + 1}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.98:level=0:latency=1,apad,atrim=duration={total}[mixed]")
-        filters.append("[0:v:0]setpts=PTS-STARTPTS[base]")
+        filters.append(f"[0:v:0]settb=expr=1/{fps},setpts=N[base]")
         visual = "base"
         for index, layer in enumerate(data.get("overlays", [])):
             input_index = len(data.get("audio", [])) + index + 1
@@ -231,18 +234,19 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
             if layer.get("source_in_ms", 0):
                 command += ["-ss", sec(layer["source_in_ms"])]
             duration = layer["end_ms"] - layer["start_ms"]
+            start_frame, end_frame = frame_index(layer["start_ms"], fps), frame_index(layer["end_ms"], fps)
             command += ["-t", sec(duration), *decoders.get(layer["asset_id"], []), "-i", str(asset_path(base, asset))]
             w, h = layer["width"], layer["height"]
             scaling = visual_fit(w, h, layer.get("fit", "contain"))
-            chain = [f"[{input_index}:v:0]trim=duration={sec(duration)}", "setpts=PTS-STARTPTS", f"fps={fps}", "format=rgba", scaling, f"colorchannelmixer=aa={layer.get('opacity', 1)}"]
+            chain = [f"[{input_index}:v:0]trim=duration={sec(duration)}", "setpts=PTS-STARTPTS", f"fps={fps}", f"settb=expr=1/{fps}", "setpts=N", "format=rgba", scaling, f"colorchannelmixer=aa={layer.get('opacity', 1)}"]
             if layer.get("fade_in_ms", 0):
                 chain.append(f"fade=t=in:st=0:d={sec(layer['fade_in_ms'])}:alpha=1")
             if layer.get("fade_out_ms", 0):
                 chain.append(f"fade=t=out:st={sec(duration - layer['fade_out_ms'])}:d={sec(layer['fade_out_ms'])}:alpha=1")
-            chain.append(f"setpts=PTS+{sec(layer['start_ms'])}/TB[ov{index}]")
+            chain.append(f"setpts=PTS+{start_frame}[ov{index}]")
             filters.append(",".join(chain))
             next_visual = f"v{index}"
-            filters.append(f"[{visual}][ov{index}]overlay=x={layer['x']}:y={layer['y']}:eof_action=pass:repeatlast=0:enable='gte(t,{sec(layer['start_ms'])})*lt(t,{sec(layer['end_ms'])})'[{next_visual}]")
+            filters.append(f"[{visual}][ov{index}]overlay=x={layer['x']}:y={layer['y']}:eof_action=pass:repeatlast=0:enable='gte(n,{start_frame})*lt(n,{end_frame})'[{next_visual}]")
             visual = next_visual
         filters.append(f"[{visual}]" + ("ass=captions.ass" if data.get("captions") else "null") + "[outv]")
         graph = ";".join(filters)
@@ -254,7 +258,7 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
         else:
             command += ["-filter_complex", graph]
         command += ["-map", "[outv]", "-map", "[mixed]"]
-        command += ["-t", total, "-frames:v", str(project['duration_ms'] * fps // 1000), "-c:v", "libx264", "-preset", "fast", "-crf", "19", "-threads", str(threads), "-pix_fmt", "yuv420p",
+        command += ["-t", total, "-frames:v", str(total_frames), "-c:v", "libx264", "-preset", "fast", "-crf", "19", "-threads", str(threads), "-pix_fmt", "yuv420p",
                     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "result.mp4"]
         print("Mixing sound, burning captions and encoding final MP4", flush=True)
         run(command, cwd=work)
@@ -263,7 +267,7 @@ def render(data: dict, base: Path, output: Path, *, overwrite: bool = False, thr
             raise LizicutError(f"Encoded duration mismatch: expected {project['duration_ms']}ms, got {report['duration_ms']}")
         if (report["width"], report["height"]) != (width, height) or report["audio_streams"] != 1:
             raise LizicutError("Encoded dimensions or audio stream count differ from timeline")
-        if int(report.get("frames") or 0) != project["duration_ms"] * fps // 1000:
+        if int(report.get("frames") or 0) != total_frames:
             raise LizicutError("Encoded frame count differs from timeline")
         # Recheck after encoding so an unrelated output created in the meantime is not overwritten.
         ensure_output(output, sources, overwrite)

@@ -6,6 +6,7 @@ import math
 import re
 import shutil
 import subprocess
+import unicodedata
 from pathlib import Path
 
 
@@ -72,6 +73,55 @@ def text(value: object, context: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise LizicutError(f"{context}: expected nonempty text")
     return value
+
+
+def time_value(value: object, context: str, minimum: float = 0, maximum: float | None = None) -> int | float:
+    if type(value) not in (int, float) or not math.isfinite(value) or value < minimum or (maximum is not None and value > maximum):
+        raise LizicutError(f"{context}: expected finite milliseconds >= {minimum}" + (f" and <= {maximum}" if maximum is not None else ""))
+    return value
+
+
+def frame_index(milliseconds: float, fps: int, context: str = "video boundary") -> int:
+    frame = math.floor(milliseconds * fps / 1000 + 0.5)
+    if abs(milliseconds - frame * 1000 / fps) > 0.001:
+        raise LizicutError(f"{context}: boundaries must be on the {fps}fps frame grid; use explicit frame indices or precise decimal milliseconds; do not silently round speech cuts")
+    return frame
+
+
+def frame_time(frame: int, fps: int) -> int | float:
+    value = frame * 1000 / fps
+    return int(value) if value.is_integer() else value
+
+
+def normalize_timing(data: dict) -> dict:
+    """Resolve explicit frame input without changing the caller's edit data."""
+    if not isinstance(data, dict) or not isinstance(data.get("project"), dict):
+        return data
+    result = {**data, "project": {**data["project"]}}
+    project = result["project"]
+    fps = integer(project.get("fps"), "project.fps", 1, 60)
+    if "duration_frames" in project:
+        if "duration_ms" in project:
+            raise LizicutError("project: choose duration_frames or duration_ms, not both")
+        project["duration_ms"] = frame_time(integer(project.pop("duration_frames"), "project.duration_frames", 1), fps)
+    for group in ("shots", "overlays"):
+        if not isinstance(data.get(group), list):
+            continue
+        result[group] = []
+        for index, raw in enumerate(data[group]):
+            if not isinstance(raw, dict):
+                result[group].append(raw)
+                continue
+            entry = dict(raw)
+            if {"start_frame", "end_frame"}.intersection(entry):
+                context = f"{group}[{index}]"
+                if {"start_ms", "end_ms"}.intersection(entry):
+                    raise LizicutError(f"{context}: choose frame boundaries or millisecond boundaries, not both")
+                start = integer(entry.pop("start_frame", None), context + ".start_frame")
+                end = integer(entry.pop("end_frame", None), context + ".end_frame", start + 1)
+                entry.update(start_ms=frame_time(start, fps), end_ms=frame_time(end, fps))
+            result[group].append(entry)
+    return result
 
 
 def choice(value: object, values: set[str], context: str) -> str:
@@ -172,6 +222,7 @@ def _referenced(data: dict) -> set[str]:
 
 
 def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
+    data = normalize_timing(data)
     obj(data, "timeline", {"version", "project", "assets", "shots", "overlays", "audio", "captions"})
     if data.get("version") != "lizicut.timeline.v1":
         raise LizicutError("version: expected lizicut.timeline.v1")
@@ -181,7 +232,7 @@ def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
         if integer(project.get(key), f"project.{key}", 16, 3840) % 2:
             raise LizicutError(f"project.{key}: use an even dimension for yuv420p")
     fps = integer(project.get("fps"), "project.fps", 1, 60)
-    total = integer(project.get("duration_ms"), "project.duration_ms", 1)
+    total = time_value(project.get("duration_ms"), "project.duration_ms", 1)
     basis = choice(project.get("timing_basis"), {"estimated", "aligned", "fixed"}, "project.timing_basis")
     mode = choice(project.get("audio_mode"), {"narrated", "original", "nonverbal", "silent"}, "project.audio_mode")
     color = project.get("background", "#20221f")
@@ -222,15 +273,15 @@ def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
         if key in seen:
             raise LizicutError(f"{context}: duplicate shot id {key}")
         seen.add(key)
-        start = integer(shot.get("start_ms"), f"{context}.start_ms")
-        end = integer(shot.get("end_ms"), f"{context}.end_ms", start + 1)
-        if start != cursor:
+        start = time_value(shot.get("start_ms"), f"{context}.start_ms")
+        end = time_value(shot.get("end_ms"), f"{context}.end_ms", start + 0.001)
+        if abs(start - cursor) > 0.000001:
             raise LizicutError(f"{context}: gap or overlap at {start}ms; expected {cursor}ms")
-        if start * fps % 1000 or end * fps % 1000:
-            raise LizicutError(f"{context}: boundaries must be on the {fps}fps frame grid")
+        if frame_index(end, fps, context) <= frame_index(start, fps, context):
+            raise LizicutError(f"{context}: video range must contain at least one frame")
         cursor = end
         asset = ref(shot.get("asset_id"), {"image", "video"}, f"{context}.asset_id")
-        source_in = integer(shot.get("source_in_ms", 0), f"{context}.source_in_ms")
+        source_in = time_value(shot.get("source_in_ms", 0), f"{context}.source_in_ms")
         choice(shot.get("fit", "contain"), {"contain", "cover"}, f"{context}.fit")
         choice(shot.get("carrier"), {"host", "footage", "graphic"}, f"{context}.carrier")
         text(shot.get("information_shape"), f"{context}.information_shape")
@@ -247,7 +298,7 @@ def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
             item = ref(evidence_id, {"image", "video", "audio"}, f"{context}.evidence_refs")
             if item["usage"] != "evidence":
                 raise LizicutError(f"{context}: illustration {evidence_id} cannot serve as factual evidence")
-    if cursor != total:
+    if abs(cursor - total) > 0.000001:
         raise LizicutError(f"shots end at {cursor}ms, project duration is {total}ms")
     overlays = data.get("overlays", [])
     if not isinstance(overlays, list):
@@ -261,16 +312,16 @@ def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
         seen.add(key)
         asset = ref(layer.get("asset_id"), {"image", "video"}, f"{context}.asset_id")
         choice(layer.get("role"), {"element", "template"}, f"{context}.role")
-        start = integer(layer.get("start_ms"), f"{context}.start_ms")
-        end = integer(layer.get("end_ms"), f"{context}.end_ms", start + 1, total)
-        if start * fps % 1000 or end * fps % 1000:
-            raise LizicutError(f"{context}: boundaries must be on the {fps}fps frame grid")
+        start = time_value(layer.get("start_ms"), f"{context}.start_ms")
+        end = time_value(layer.get("end_ms"), f"{context}.end_ms", start + 0.001, total)
+        if frame_index(end, fps, context) <= frame_index(start, fps, context):
+            raise LizicutError(f"{context}: video range must contain at least one frame")
         for axis, dimension in (("x", "width"), ("y", "height")):
             position = integer(layer.get(axis), f"{context}.{axis}")
             size = integer(layer.get(dimension), f"{context}.{dimension}", 2, project[dimension])
             if position + size > project[dimension]:
                 raise LizicutError(f"{context}: rectangle extends beyond project {dimension}")
-        source_in = integer(layer.get("source_in_ms", 0), f"{context}.source_in_ms")
+        source_in = time_value(layer.get("source_in_ms", 0), f"{context}.source_in_ms")
         choice(layer.get("fit", "contain"), {"contain", "cover"}, f"{context}.fit")
         if type(layer.get("loop", False)) is not bool:
             raise LizicutError(f"{context}.loop: expected boolean")
@@ -302,9 +353,11 @@ def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
         track_ids.add(track_id)
         ref(track.get("asset_id"), {"audio", "video"}, f"{context}.asset_id")
         role = choice(track.get("role"), {"narration", "original", "bgm", "sfx"}, f"{context}.role")
-        start = integer(track.get("start_ms"), f"{context}.start_ms")
-        end = integer(track.get("end_ms"), f"{context}.end_ms", start + 1, total)
-        source_in = integer(track.get("source_in_ms", 0), f"{context}.source_in_ms")
+        start = time_value(track.get("start_ms"), f"{context}.start_ms")
+        end = time_value(track.get("end_ms"), f"{context}.end_ms", start + 0.001, total)
+        if round((end - start) * 48) < 1:
+            raise LizicutError(f"{context}: audio range must contain at least one 48kHz sample")
+        source_in = time_value(track.get("source_in_ms", 0), f"{context}.source_in_ms")
         gain = number(track.get("gain", 1), f"{context}.gain")
         if gain > 0:
             roles.append(role)
@@ -336,19 +389,66 @@ def validate(data: dict, base: Path, *, media: bool = False) -> list[str]:
         raise LizicutError("BGM ducking requires audible narration or original-sound tracks")
     caption = data.get("captions")
     if caption is not None:
-        obj(caption, "captions", {"asset_id", "font_name", "font_size", "margin_bottom"})
+        obj(caption, "captions", {"asset_id", "font_name", "font_size", "margin_bottom", "margin_side", "max_lines", "max_cps", "min_duration_ms", "max_duration_ms"})
         ref(caption.get("asset_id"), {"subtitle"}, "captions.asset_id")
         font = text(caption.get("font_name", "sans-serif"), "captions.font_name")
         if any(char in font for char in ",\\\n\r{}"):  # ASS style is not an arbitrary filter string.
             raise LizicutError("captions.font_name: unsupported style delimiter")
         integer(caption.get("font_size", 32), "captions.font_size", 8, 128)
         integer(caption.get("margin_bottom", 36), "captions.margin_bottom", 0, project["height"] // 2)
+        integer(caption.get("margin_side", 40), "captions.margin_side", 0, (project["width"] - 1) // 2)
+        integer(caption.get("max_lines", 2), "captions.max_lines", 1, 12)
+        number(caption.get("max_cps", 21), "captions.max_cps", 1, 200)
+        minimum = integer(caption.get("min_duration_ms", 900), "captions.min_duration_ms", 0, 120000)
+        integer(caption.get("max_duration_ms", 6000), "captions.max_duration_ms", max(1, minimum), 120000)
     if media:
         validate_media(data, base)
+        warnings.extend(caption_warnings(data, base))
+    return warnings
+
+
+def caption_warnings(data: dict, base: Path) -> list[str]:
+    """Reject invisible cues; flag reading load without guessing new speech timing."""
+    if not data.get("captions"):
+        return []
+    project, style = data["project"], data["captions"]
+    fps = project["fps"]
+    frames = frame_index(project["duration_ms"], fps)
+    cues = read_srt(asset_path(base, data["assets"][style["asset_id"]]))
+    font_size = style.get("font_size", 32)
+    width = project["width"] - 2 * style.get("margin_side", 40)
+    max_lines = style.get("max_lines", 2)
+    warnings = []
+    for index, cue in enumerate(cues, 1):
+        context = f"SRT cue {index}"
+        # ASS floors to centiseconds. Test the actual video sampling grid too.
+        start, end = cue["start_ms"] // 10 * 10, cue["end_ms"] // 10 * 10
+        first, stop = (start * fps + 999) // 1000, (end * fps + 999) // 1000
+        if first >= min(stop, frames):
+            raise LizicutError(f"{context}: no visible video frame after ASS timing conversion; check actual audio and merge/re-time the cue")
+        lines = cue["text"].splitlines()
+        if len(lines) > max_lines:
+            raise LizicutError(f"{context}: {len(lines)} explicit lines exceed max_lines={max_lines}; split using actual speech timing or adjust the caption layout and budget")
+        estimated_lines = 0
+        for line in lines:
+            units = sum(0 if unicodedata.combining(char) else
+                        1 if unicodedata.east_asian_width(char) in {"W", "F"} else 0.55 for char in line)
+            estimated_lines += max(1, math.ceil(units * font_size / width))
+        if estimated_lines > max_lines:
+            warnings.append(f"{context}: estimated wrapping needs {estimated_lines} lines (budget {max_lines}); shorten/split with actual timing or adjust font/side margins; verify the real rendered font")
+        if estimated_lines * font_size * 1.25 > project["height"] - style.get("margin_bottom", 36):
+            warnings.append(f"{context}: estimated caption block exceeds canvas height; repair layout before final delivery and inspect actual frames")
+        duration = cue["end_ms"] - cue["start_ms"]
+        cps = sum(not char.isspace() for char in cue["text"]) * 1000 / duration
+        if cps > style.get("max_cps", 21):
+            warnings.append(f"{context}: reading speed {cps:.1f} chars/s exceeds max_cps={style.get('max_cps', 21)}; split by actual speech or give the information more readable time")
+        if duration < style.get("min_duration_ms", 900) or duration > style.get("max_duration_ms", 6000):
+            warnings.append(f"{context}: duration {duration}ms is outside the reading budget {style.get('min_duration_ms', 900)}..{style.get('max_duration_ms', 6000)}ms; review timing, do not invent word boundaries")
     return warnings
 
 
 def validate_media(data: dict, base: Path) -> dict[str, dict]:
+    data = normalize_timing(data)
     infos = {}
     for key in _referenced(data):
         asset = data["assets"][key]
@@ -357,7 +457,7 @@ def validate_media(data: dict, base: Path) -> dict[str, dict]:
             raise LizicutError(f"assets.{key}: missing file {path}")
         if asset["kind"] == "subtitle":
             cues = read_srt(path)
-            if cues[-1]["end_ms"] > data["project"]["duration_ms"]:
+            if cues[-1]["end_ms"] > data["project"]["duration_ms"] + 0.5:
                 raise LizicutError(f"assets.{key}: captions extend beyond project duration")
             continue
         info = probe(path)
@@ -434,7 +534,7 @@ def write_srt(cues: list[dict], path: Path) -> None:
 
 def retime(cues: list[dict], cuts: dict) -> list[dict]:
     obj(cuts, "cuts", {"source_duration_ms", "kept_ranges"})
-    total = integer(cuts.get("source_duration_ms"), "cuts.source_duration_ms", 1)
+    total = time_value(cuts.get("source_duration_ms"), "cuts.source_duration_ms", 1)
     ranges = cuts.get("kept_ranges")
     if not isinstance(ranges, list) or not ranges:
         raise LizicutError("cuts.kept_ranges: expected nonempty list")
@@ -443,8 +543,8 @@ def retime(cues: list[dict], cuts: dict) -> list[dict]:
     previous = 0
     for index, raw in enumerate(ranges):
         item = obj(raw, f"kept_ranges[{index}]", {"start_ms", "end_ms"})
-        start = integer(item.get("start_ms"), "range.start_ms", previous)
-        end = integer(item.get("end_ms"), "range.end_ms", start + 1, total)
+        start = time_value(item.get("start_ms"), "range.start_ms", previous)
+        end = time_value(item.get("end_ms"), "range.end_ms", start + 0.001, total)
         if mapped and start == mapped[-1][1]:
             mapped[-1] = (mapped[-1][0], end, mapped[-1][2])
         else:
@@ -453,13 +553,18 @@ def retime(cues: list[dict], cuts: dict) -> list[dict]:
         previous = end
     result = []
     for index, cue in enumerate(cues, 1):
-        if cue["end_ms"] > total:
+        if cue["end_ms"] > total + 0.5:
             raise LizicutError(f"SRT cue {index} extends beyond source duration")
-        intersections = [(start, end, offset) for start, end, offset in mapped if cue["start_ms"] < end and cue["end_ms"] > start]
+        cue_end = min(cue["end_ms"], total)  # At most half a millisecond of SRT tail rounding.
+        intersections = [(start, end, offset) for start, end, offset in mapped if cue["start_ms"] < end and cue_end > start]
         if not intersections:
             continue
         start, end, offset = intersections[0]
-        if len(intersections) != 1 or cue["start_ms"] < start or cue["end_ms"] > end:
+        if len(intersections) != 1 or cue["start_ms"] < start or cue_end > end:
             raise LizicutError(f"SRT cue {index} crosses a cut ({stamp(cue['start_ms'])} --> {stamp(cue['end_ms'])}); split the text using actual audio before retiming")
-        result.append({**cue, "start_ms": offset + cue["start_ms"] - start, "end_ms": offset + cue["end_ms"] - start})
+        mapped_start = math.floor(offset + cue["start_ms"] - start + 0.5)
+        mapped_end = min(math.floor(offset + cue_end - start + 0.5), math.floor(cursor + 0.000001))
+        if mapped_end <= mapped_start:
+            raise LizicutError(f"SRT cue {index}: no duration remains at SRT millisecond precision")
+        result.append({**cue, "start_ms": mapped_start, "end_ms": mapped_end})
     return result

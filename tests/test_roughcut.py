@@ -77,6 +77,39 @@ class RoughcutPlanTests(unittest.TestCase):
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "existing FFmpeg required")
 class RoughcutMediaTests(unittest.TestCase):
+    def test_thirty_fps_fractional_cut_preserves_source_frames_audio_and_srt(self):
+        with tempfile.TemporaryDirectory(prefix="lizicut 30fps source ") as folder:
+            base = Path(folder)
+            ffmpeg = shutil.which("ffmpeg")
+            run([ffmpeg, "-v", "error", "-nostdin", "-f", "lavfi", "-i", "color=c=green:s=192x108:r=30:d=1",
+                 "-f", "lavfi", "-i", "sine=frequency=440:duration=1:sample_rate=48000", "-vf",
+                 "drawbox=c=red:t=fill:enable='eq(n,0)',drawbox=c=blue:t=fill:enable='eq(n,2)'",
+                 "-c:v", "libx264", "-threads", "1", "-c:a", "aac", str(base / "source.mp4")])
+            write_srt([{"start_ms": 100, "end_ms": 1000, "text": "preserved words"}], base / "source.srt")
+            data = plan()
+            data.update(source_duration_ms=1000, captions="source.srt", splice_fade_ms=0)
+            data["video"]["fps"] = 30
+            data["decisions"] = [{"id": "frame-two", "start_ms": 1000 / 30, "end_ms": 2000 / 30,
+                                  "action": "remove", "category": "pause", "reason": "remove the authored second frame",
+                                  "evidence": "synthetic frame colors and exact frame-derived timing", "timing_checked": True}]
+            result = prepare(data, base, base / "video", render_now=True, threads=1)
+            self.assertEqual(int(result["media"]["frames"]), 29)
+            self.assertAlmostEqual(result["duration_ms"], 29000 / 30)
+            raw = subprocess.run([ffmpeg, "-v", "error", "-i", str(base / "video/roughcut.mp4"), "-f", "rawvideo",
+                                  "-pix_fmt", "rgb24", "pipe:1"], capture_output=True, check=True).stdout
+            offset = (192 * 108 + 54 * 192 + 96) * 3
+            self.assertGreater(raw[offset + 2], 180, "the retained blue source frame must survive seeking")
+            self.assertEqual(read_srt(base / "video/captions.srt"), [{"start_ms": 67, "end_ms": 966, "text": "preserved words"}])
+            run([ffmpeg, "-v", "error", "-nostdin", "-i", str(base / "source.mp4"), "-vn", "-c:a", "pcm_s16le", str(base / "source.wav")])
+            data["source"].update(path="source.wav", kind="audio")
+            data.pop("video")
+            # AAC decoding may expose trailing padding; use the actual WAV duration as its source contract.
+            with wave.open(str(base / "source.wav"), "rb") as audio:
+                data["source_duration_ms"] = audio.getnframes() * 1000 / audio.getframerate()
+            audio_result = prepare(data, base, base / "audio", render_now=True)
+            with wave.open(str(base / "audio/roughcut.wav"), "rb") as audio:
+                self.assertEqual(audio.getnframes(), round(audio_result["duration_ms"] * 48))
+
     def test_delayed_audio_preserves_shared_clock_leading_silence_and_source_tail(self):
         with tempfile.TemporaryDirectory(prefix="lizicut shared clock ") as folder:
             base = Path(folder)
