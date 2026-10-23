@@ -1,0 +1,8 @@
+{
+  "description": "虚构演示数据，不对应真实公司，也不用于投资判断。",
+  "unit": "万元",
+  "periods": [
+    {"name": "上一期", "revenue": 100, "cost": 80, "profit": 20},
+    {"name": "这一期", "revenue": 120, "cost": 108, "profit": 12}
+  ]
+}

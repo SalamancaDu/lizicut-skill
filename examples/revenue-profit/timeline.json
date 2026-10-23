@@ -1,0 +1,399 @@
+{
+  "version": "lizicut.timeline.v1",
+  "project": {
+    "title": "营收增长，为什么利润反而下降？",
+    "width": 1280,
+    "height": 720,
+    "fps": 25,
+    "duration_ms": 63000,
+    "timing_basis": "aligned",
+    "audio_mode": "narrated",
+    "background": "#20221f"
+  },
+  "assets": {
+    "contrast-1": {
+      "path": "assets/contrast-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "contrast-2": {
+      "path": "assets/contrast-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "contrast": {
+      "path": "assets/contrast.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "data.json + authored board contrast; all values fictional",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "relation-1": {
+      "path": "assets/relation-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "relation-2": {
+      "path": "assets/relation-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "relation": {
+      "path": "assets/relation.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "data.json + authored board relation; all values fictional",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "compare-1": {
+      "path": "assets/compare-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "compare-2": {
+      "path": "assets/compare-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "compare": {
+      "path": "assets/compare.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "data.json + authored board compare; all values fictional",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "change-1": {
+      "path": "assets/change-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "change-2": {
+      "path": "assets/change-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "change": {
+      "path": "assets/change.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "data.json + authored board change; all values fictional",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "margin-1": {
+      "path": "assets/margin-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "margin-2": {
+      "path": "assets/margin-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "margin": {
+      "path": "assets/margin.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "data.json + authored board margin; all values fictional",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "recap-1": {
+      "path": "assets/recap-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "recap-2": {
+      "path": "assets/recap-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "recap": {
+      "path": "assets/recap.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "data.json + authored board recap; all values fictional",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "captions": {
+      "path": "captions.srt",
+      "kind": "subtitle",
+      "source_type": "designed",
+      "source_ref": "script.json; individually synthesized utterance durations, not word-level ASR",
+      "usage": "illustration",
+      "license": "MIT"
+    }
+  },
+  "shots": [
+    {
+      "id": "shot-01",
+      "start_ms": 0,
+      "end_ms": 9360,
+      "asset_id": "contrast",
+      "source_in_ms": 0,
+      "fit": "contain",
+      "carrier": "graphic",
+      "information_shape": "comparison",
+      "purpose": "增长的反差",
+      "decision": "同板对比增长与下降；完整口播放字幕，关键词保持简短。",
+      "evidence_refs": []
+    },
+    {
+      "id": "shot-02",
+      "start_ms": 9360,
+      "end_ms": 18640,
+      "asset_id": "relation",
+      "source_in_ms": 0,
+      "fit": "contain",
+      "carrier": "graphic",
+      "information_shape": "mechanism",
+      "purpose": "先把关系摆出来",
+      "decision": "先固定收入、成本与利润的关系；虚构数据不充当事实证据。",
+      "evidence_refs": []
+    },
+    {
+      "id": "shot-03",
+      "start_ms": 18640,
+      "end_ms": 31480,
+      "asset_id": "compare",
+      "source_in_ms": 0,
+      "fit": "contain",
+      "carrier": "graphic",
+      "information_shape": "comparison",
+      "purpose": "同一尺度，比较两期",
+      "decision": "两期共用尺度和位置；第二期在对应句子出现，保留第一期便于比较。",
+      "evidence_refs": []
+    },
+    {
+      "id": "shot-04",
+      "start_ms": 31480,
+      "end_ms": 41760,
+      "asset_id": "change",
+      "source_in_ms": 0,
+      "fit": "contain",
+      "carrier": "graphic",
+      "information_shape": "change",
+      "purpose": "成本跑得更快",
+      "decision": "延续成本与利润的身份；用新增金额解释利润减少的原因。",
+      "evidence_refs": []
+    },
+    {
+      "id": "shot-05",
+      "start_ms": 41760,
+      "end_ms": 51600,
+      "asset_id": "margin",
+      "source_in_ms": 0,
+      "fit": "contain",
+      "carrier": "graphic",
+      "information_shape": "ratio",
+      "purpose": "规模之外，还有效率",
+      "decision": "补充效率维度；百分比与条长保持一致，不用图形夸大差异。",
+      "evidence_refs": []
+    },
+    {
+      "id": "shot-06",
+      "start_ms": 51600,
+      "end_ms": 63000,
+      "asset_id": "recap",
+      "source_in_ms": 0,
+      "fit": "contain",
+      "carrier": "graphic",
+      "information_shape": "summary",
+      "purpose": "先看关系，再看数字",
+      "decision": "减少信息并收束问题；不引入未经论证的新结论。",
+      "evidence_refs": []
+    }
+  ],
+  "audio": [
+    {
+      "id": "contrast-1",
+      "asset_id": "contrast-1",
+      "role": "narration",
+      "start_ms": 0,
+      "end_ms": 3412,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "contrast-2",
+      "asset_id": "contrast-2",
+      "role": "narration",
+      "start_ms": 3600,
+      "end_ms": 8584,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "relation-1",
+      "asset_id": "relation-1",
+      "role": "narration",
+      "start_ms": 9360,
+      "end_ms": 13908,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "relation-2",
+      "asset_id": "relation-2",
+      "role": "narration",
+      "start_ms": 14080,
+      "end_ms": 17874,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "compare-1",
+      "asset_id": "compare-1",
+      "role": "narration",
+      "start_ms": 18640,
+      "end_ms": 24311,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "compare-2",
+      "asset_id": "compare-2",
+      "role": "narration",
+      "start_ms": 24480,
+      "end_ms": 30694,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "change-1",
+      "asset_id": "change-1",
+      "role": "narration",
+      "start_ms": 31480,
+      "end_ms": 35924,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "change-2",
+      "asset_id": "change-2",
+      "role": "narration",
+      "start_ms": 36120,
+      "end_ms": 41000,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "margin-1",
+      "asset_id": "margin-1",
+      "role": "narration",
+      "start_ms": 41760,
+      "end_ms": 46380,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "margin-2",
+      "asset_id": "margin-2",
+      "role": "narration",
+      "start_ms": 46560,
+      "end_ms": 50803,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "recap-1",
+      "asset_id": "recap-1",
+      "role": "narration",
+      "start_ms": 51600,
+      "end_ms": 55959,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "recap-2",
+      "asset_id": "recap-2",
+      "role": "narration",
+      "start_ms": 56120,
+      "end_ms": 62213,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    }
+  ],
+  "captions": {
+    "asset_id": "captions",
+    "font_name": "Microsoft YaHei",
+    "font_size": 30,
+    "margin_bottom": 32
+  }
+}

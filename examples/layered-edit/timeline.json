@@ -1,0 +1,258 @@
+{
+  "version": "lizicut.timeline.v1",
+  "project": {
+    "title": "营收与利润 · 竖屏分层示例",
+    "width": 720,
+    "height": 1280,
+    "fps": 25,
+    "duration_ms": 9360,
+    "timing_basis": "aligned",
+    "audio_mode": "narrated",
+    "background": "#20221f"
+  },
+  "assets": {
+    "title": {
+      "path": "assets/title.png",
+      "kind": "image",
+      "source_type": "designed",
+      "source_ref": "原创演示素材，不是真实公司证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "context": {
+      "path": "assets/context.png",
+      "kind": "image",
+      "source_type": "designed",
+      "source_ref": "原创演示素材，不是真实公司证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "contrast": {
+      "path": "assets/contrast.png",
+      "kind": "image",
+      "source_type": "designed",
+      "source_ref": "原创演示素材，不是真实公司证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "relation": {
+      "path": "assets/relation.png",
+      "kind": "image",
+      "source_type": "designed",
+      "source_ref": "原创演示素材，不是真实公司证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "marker": {
+      "path": "assets/marker.png",
+      "kind": "image",
+      "source_type": "designed",
+      "source_ref": "原创演示素材，不是真实公司证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "background": {
+      "path": "assets/background.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "原创演示素材，不是真实公司证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "music": {
+      "path": "assets/music.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "原创低电平测试音，不是正式音乐或原声证据",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "comparison": {
+      "path": "assets/comparison.mp4",
+      "kind": "video",
+      "source_type": "designed",
+      "source_ref": "依据同一组虚构两期数据为竖屏重新排版，共用同一尺度",
+      "usage": "illustration",
+      "license": "MIT"
+    },
+    "contrast-1": {
+      "path": "../revenue-profit/assets/contrast-1.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "contrast-2": {
+      "path": "../revenue-profit/assets/contrast-2.wav",
+      "kind": "audio",
+      "source_type": "synthetic_audio",
+      "source_ref": "Local installed Windows Simplified Chinese SAPI voice; authored demo text",
+      "usage": "illustration",
+      "license": "demo output; voice engine not redistributed",
+      "note": "合成示范旁白，不是真实人物原声"
+    },
+    "captions": {
+      "path": "captions.srt",
+      "kind": "subtitle",
+      "source_type": "designed",
+      "source_ref": "复用实测句段声音时间，非词级识别",
+      "usage": "illustration",
+      "license": "MIT"
+    }
+  },
+  "shots": [
+    {
+      "id": "background",
+      "asset_id": "background",
+      "start_ms": 0,
+      "end_ms": 9360,
+      "loop": true,
+      "carrier": "graphic",
+      "information_shape": "comparison",
+      "purpose": "保持稳定阅读空间",
+      "decision": "背景长循环，元素与模板独立进入，不逐句换整帧"
+    }
+  ],
+  "overlays": [
+    {
+      "id": "title",
+      "asset_id": "title",
+      "role": "template",
+      "start_ms": 0,
+      "end_ms": 9360,
+      "source_in_ms": 0,
+      "x": 32,
+      "y": 150,
+      "width": 656,
+      "height": 176,
+      "fade_in_ms": 200,
+      "fade_out_ms": 160,
+      "purpose": "保持标题、来源身份与解释锚点",
+      "decision": "句级时间下保守揭示；保持独立图层，可直接修改时序"
+    },
+    {
+      "id": "context",
+      "asset_id": "context",
+      "role": "template",
+      "start_ms": 0,
+      "end_ms": 9360,
+      "source_in_ms": 0,
+      "x": 32,
+      "y": 36,
+      "width": 656,
+      "height": 96,
+      "fade_in_ms": 200,
+      "fade_out_ms": 160,
+      "purpose": "保持标题、来源身份与解释锚点",
+      "decision": "句级时间下保守揭示；保持独立图层，可直接修改时序"
+    },
+    {
+      "id": "marker",
+      "asset_id": "marker",
+      "role": "element",
+      "start_ms": 240,
+      "end_ms": 3600,
+      "source_in_ms": 0,
+      "x": 32,
+      "y": 365,
+      "width": 320,
+      "height": 120,
+      "fade_in_ms": 200,
+      "fade_out_ms": 160,
+      "purpose": "保持标题、来源身份与解释锚点",
+      "decision": "句级时间下保守揭示；保持独立图层，可直接修改时序"
+    },
+    {
+      "id": "contrast",
+      "asset_id": "contrast",
+      "role": "template",
+      "start_ms": 240,
+      "end_ms": 3600,
+      "source_in_ms": 0,
+      "x": 32,
+      "y": 520,
+      "width": 656,
+      "height": 260,
+      "fade_in_ms": 200,
+      "fade_out_ms": 160,
+      "purpose": "第一句完整呈现营收与利润的反差",
+      "decision": "句级时间下保守揭示；保持独立图层，可直接修改时序"
+    },
+    {
+      "id": "comparison",
+      "asset_id": "comparison",
+      "role": "template",
+      "start_ms": 3600,
+      "end_ms": 9360,
+      "source_in_ms": 1600,
+      "x": 32,
+      "y": 510,
+      "width": 656,
+      "height": 420,
+      "fade_in_ms": 200,
+      "fade_out_ms": 160,
+      "purpose": "第二句在同板上建立两期对照",
+      "decision": "句级时间下保守揭示；保持独立图层，可直接修改时序"
+    },
+    {
+      "id": "relation",
+      "asset_id": "relation",
+      "role": "template",
+      "start_ms": 3600,
+      "end_ms": 9360,
+      "source_in_ms": 0,
+      "x": 32,
+      "y": 365,
+      "width": 656,
+      "height": 100,
+      "fade_in_ms": 200,
+      "fade_out_ms": 160,
+      "purpose": "保持标题、来源身份与解释锚点",
+      "decision": "句级时间下保守揭示；保持独立图层，可直接修改时序"
+    }
+  ],
+  "audio": [
+    {
+      "id": "contrast-1",
+      "asset_id": "contrast-1",
+      "role": "narration",
+      "start_ms": 0,
+      "end_ms": 3412,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "contrast-2",
+      "asset_id": "contrast-2",
+      "role": "narration",
+      "start_ms": 3600,
+      "end_ms": 8584,
+      "source_in_ms": 0,
+      "gain": 0.92,
+      "fade_in_ms": 8,
+      "fade_out_ms": 16
+    },
+    {
+      "id": "music",
+      "asset_id": "music",
+      "role": "bgm",
+      "start_ms": 0,
+      "end_ms": 9360,
+      "loop": true,
+      "gain": 0.06,
+      "duck_gain": 0.35,
+      "fade_in_ms": 200,
+      "fade_out_ms": 500
+    }
+  ],
+  "captions": {
+    "asset_id": "captions",
+    "font_name": "Microsoft YaHei",
+    "font_size": 34,
+    "margin_bottom": 80
+  }
+}
