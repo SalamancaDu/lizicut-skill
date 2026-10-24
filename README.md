@@ -2,9 +2,9 @@
 
 把“这段话应该怎样剪”变成智能体可以执行的判断：先找解释任务，再组织画面、素材、声音与时间。默认以财经科普为主要场景，也支持商业分析、公司/行业机制和其他解释型内容。
 
-当前版本为 **v0.2.1**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
+当前版本为 **v0.2.2**。方法来自原 lizicut.com / SnapFilm 项目及三份剪辑思维导图，已去除旧网站运行依赖。完整代码、规则和自制示例按 MIT 开源。
 
-[下载 v0.2.1](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.2.1) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
+[下载 v0.2.2](https://github.com/SalamancaDu/lizicut-skill/releases/tag/v0.2.2) · [Skill 入口](skills/lizicut/SKILL.md) · [许可](LICENSE)
 
 ## 从这里开始
 
@@ -79,6 +79,8 @@ v0.1.7 修复动画入场丢首帧、非整毫秒帧周期无法逐帧编排及�
 v0.2.0 将 PR 设为主执行端，增加文稿/录音确认节点、Premiere MCP 的发现/回读/序列副本/粗剪/素材上轨/字幕/关键帧/标记/保存/导出前检查，以及 PS/Illustrator/AE 可选协作。真实 PR 测试工程已验证 12.96 秒源素材按 `[0,3.6)` 与 `[7.2,12.96)` 重建为 9.36 秒，导入 PS 定版与 AE 透明动效，创建字幕轨、音乐轨和关键帧，实际导出静帧并通过无离线素材/无空隙检查。当前环境缺少可运行的 Adobe Media Encoder，PR 导出任务只能确认已入队，不能把它写成 MP4 成功；见 [v0.2.0 复核](docs/review-v0.2.0.md)。
 
 v0.2.1 根据 AEPS 粗剪评估补齐：时间线间隙默认 0 帧、完整句/段结束才允许 5–8 帧、超过 8 帧失败；同时区分时间线空洞与片段内部静音/黑帧，保护目标工程/序列并处理 MCP 异常回包。字幕增加 `sourceSrtPath/sourceSrtOffset` 源回读约定、无标点字幕的显式样式配置，以及原生字幕轨与最终画面可见性的双层验收。此版本通过 Skill 结构检查、项目检查及既有粗剪/字幕/素材回归；未把新的规则文档更新冒充成一次新的用户 PR 工程实剪验收。
+
+v0.2.2 补齐视频素材搜索路由：真实人物和热点事件先组合准确主体、`纪录片/documentary`、`历史/history`、`故事/story`、`采访/interview`、`档案/archive` 或 `官方/official` 等高信息密度词，再一次只调整一个检索维度；同时区分来源质量、内容上下文、实际可用性和授权条件。已通过 Skill 结构检查、项目检查及既有粗剪/字幕/素材回归。
 
 ```text
 python skills/lizicut/scripts/lizicut.py doctor

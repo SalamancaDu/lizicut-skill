@@ -2,7 +2,7 @@
 name: lizicut
 description: "按李子的剪辑方法，以 Premiere Pro 为主执行端制作解释型视频。由 Codex、Claude 等智能体确认文稿和录音，完成口播粗剪、素材搜集与生成、视觉与动效、音画对齐及成片；按需协作 Photoshop、Illustrator 和 After Effects。适用于财经科普、商业分析及需要画面承担解释工作的内容，也可只完成其中一段。"
 metadata:
-  version: "0.2.1"
+  version: "0.2.2"
 ---
 
 # Lizicut · 让画面承担解释工作

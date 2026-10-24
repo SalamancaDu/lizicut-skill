@@ -58,4 +58,6 @@ v0.2.0 按用户明确的新目标把 Premiere Pro 设为主执行端：确认�
 
 v0.2.1 根据 AEPS 粗剪评估补齐 PR 粗剪的硬间隙门槛、目标序列保护、异常回包恢复、源 SRT 回读和字幕可见性验收。评估中的 MCP 改动属于执行端能力，Skill 只在 schema 支持时调用 `sourceSrtPath/sourceSrtOffset`，并保留直接解析 SRT 的回退；字幕轨、单帧和入队结果均不能单独证明最终画面字幕可见。
 
+v0.2.2 补齐思维导图中的视频搜索路由：真实人物/热点事件先用高信息密度的 `纪录片/documentary`、`历史/history`、`故事/story`、`采访/interview`、`档案/archive`、`官方/official` 等媒体词和关键词组合检索，再逐步调整日期、地点、语言或动作。高质量按来源、上下文、可用性和授权判断，不以搜索排名或分辨率替代核验。
+
 v0.1.1 复审时还核对了 `audio-branch.ts`（无录音不强制生成）、`image-source-policy.ts`（可配置来源/导入能力）、`template-subtitle-policy-surface-v1.ts`（字幕安全区和预览/导出职责）、`default-motion-strategy-v1.ts`（按场景委托动作规划）。本包保留输入分支、真实能力检查、字幕独立与动作职责，不迁移供应商、数据库开关和模板编辑器协议。

@@ -7,5 +7,7 @@ dist/
 examples/premiere-workflow/media/
 examples/premiere-workflow/output/
 examples/premiere-workflow/*.prproj
+examples/premiere-workflow/*.prin
 examples/premiere-workflow/Adobe Premiere Pro Auto-Save/
 examples/premiere-workflow/media/Adobe After Effects 自动保存/
+examples/premiere-workflow/Motion Graphics Template Media/
