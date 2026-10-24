@@ -56,4 +56,6 @@ v0.1.7 补齐上述字幕阅读预算及超载处理路径，并修正本包执�
 
 v0.2.0 按用户明确的新目标把 Premiere Pro 设为主执行端：确认文稿/录音后，在真实工程或序列副本中实施粗剪、素材导入、字幕、关键帧、标记、保存和导出前检查；FFmpeg 保留为辅助路径。新增 PS/Illustrator/AE 可选交接规则，并在本机通过 Premiere MCP、Photoshop 与 After Effects 的自制测试工程核对。AME 缺失时只报告排队与导出缺口，不把导出请求当作成片。
 
+v0.2.1 根据 AEPS 粗剪评估补齐 PR 粗剪的硬间隙门槛、目标序列保护、异常回包恢复、源 SRT 回读和字幕可见性验收。评估中的 MCP 改动属于执行端能力，Skill 只在 schema 支持时调用 `sourceSrtPath/sourceSrtOffset`，并保留直接解析 SRT 的回退；字幕轨、单帧和入队结果均不能单独证明最终画面字幕可见。
+
 v0.1.1 复审时还核对了 `audio-branch.ts`（无录音不强制生成）、`image-source-policy.ts`（可配置来源/导入能力）、`template-subtitle-policy-surface-v1.ts`（字幕安全区和预览/导出职责）、`default-motion-strategy-v1.ts`（按场景委托动作规划）。本包保留输入分支、真实能力检查、字幕独立与动作职责，不迁移供应商、数据库开关和模板编辑器协议。
